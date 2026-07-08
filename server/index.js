@@ -4,7 +4,7 @@ import bcrypt from 'bcryptjs'
 import fs from 'fs'
 import path from 'path'
 import { fileURLToPath } from 'url'
-import db from './db.js'
+import { findUserByEmail, emailExists, createUser } from './db.js'
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url))
 const clientDist = path.join(__dirname, '../client/dist')
@@ -64,7 +64,7 @@ app.post('/api/auth/login', (req, res) => {
   const { email, password } = req.body
   if (!email || !password) return res.status(400).json({ error: 'Email and password required' })
 
-  const user = db.prepare('SELECT * FROM users WHERE email = ?').get(email)
+  const user = findUserByEmail(email)
   if (!user || !bcrypt.compareSync(password, user.password)) {
     return res.status(401).json({ error: 'Invalid email or password' })
   }
@@ -76,15 +76,12 @@ app.post('/api/auth/signup', (req, res) => {
   const { name, email, password } = req.body
   if (!name || !email || !password) return res.status(400).json({ error: 'All fields required' })
 
-  const existing = db.prepare('SELECT id FROM users WHERE email = ?').get(email)
-  if (existing) return res.status(409).json({ error: 'Email already registered' })
+  if (emailExists(email)) return res.status(409).json({ error: 'Email already registered' })
 
-  const result = db.prepare(
-    'INSERT INTO users (name, email, password, role) VALUES (?, ?, ?, ?)'
-  ).run(name, email, bcrypt.hashSync(password, 10), 'customer')
+  const user = createUser(name, email, bcrypt.hashSync(password, 10), 'customer')
 
   res.status(201).json({
-    user: { id: result.lastInsertRowid, name, email, role: 'customer' },
+    user: { id: user.id, name, email, role: 'customer' },
   })
 })
 

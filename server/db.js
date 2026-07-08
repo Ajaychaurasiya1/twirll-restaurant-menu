@@ -1,32 +1,46 @@
-import Database from 'better-sqlite3'
-import bcrypt from 'bcryptjs'
+import fs from 'fs'
+import path from 'path'
 import { fileURLToPath } from 'url'
-import { dirname, join } from 'path'
+import bcrypt from 'bcryptjs'
 import { seedUsers } from './seedUsers.js'
 
-const __dirname = dirname(fileURLToPath(import.meta.url))
-const db = new Database(join(__dirname, 'users.db'))
+const __dirname = path.dirname(fileURLToPath(import.meta.url))
+const dbPath = path.join(__dirname, 'users.json')
 
-db.exec(`
-  CREATE TABLE IF NOT EXISTS users (
-    id INTEGER PRIMARY KEY,
-    name TEXT NOT NULL,
-    email TEXT UNIQUE NOT NULL,
-    password TEXT NOT NULL,
-    role TEXT NOT NULL DEFAULT 'customer'
-  )
-`)
-
-const count = db.prepare('SELECT COUNT(*) as c FROM users').get().c
-if (count === 0) {
-  const insert = db.prepare('INSERT INTO users (id, name, email, password, role) VALUES (?, ?, ?, ?, ?)')
-  const tx = db.transaction((users) => {
-    for (const u of users) {
-      insert.run(u.id, u.name, u.email, bcrypt.hashSync(u.password, 10), u.role)
-    }
-  })
-  tx(seedUsers)
-  console.log(`Seeded ${seedUsers.length} users`)
+function loadUsers() {
+  if (!fs.existsSync(dbPath)) {
+    const users = seedUsers.map((u) => ({
+      id: u.id,
+      name: u.name,
+      email: u.email,
+      password: bcrypt.hashSync(u.password, 10),
+      role: u.role,
+    }))
+    fs.writeFileSync(dbPath, JSON.stringify(users, null, 2))
+    console.log(`Seeded ${users.length} users`)
+    return users
+  }
+  return JSON.parse(fs.readFileSync(dbPath, 'utf8'))
 }
 
-export default db
+function saveUsers(users) {
+  fs.writeFileSync(dbPath, JSON.stringify(users, null, 2))
+}
+
+let users = loadUsers()
+
+export function findUserByEmail(email) {
+  return users.find((u) => u.email === email) || null
+}
+
+export function emailExists(email) {
+  return users.some((u) => u.email === email)
+}
+
+export function createUser(name, email, passwordHash, role = 'customer') {
+  const id = users.length ? Math.max(...users.map((u) => u.id)) + 1 : 1
+  const user = { id, name, email, password: passwordHash, role }
+  users.push(user)
+  saveUsers(users)
+  return user
+}
