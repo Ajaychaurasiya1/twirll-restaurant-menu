@@ -97,9 +97,7 @@ export default function Menu() {
               <h3>{item.product_name}</h3>
               {item.item_short_description && <p>{item.item_short_description}</p>}
               <p className="price">
-                {item.selling_price === item.max_selling_price
-                  ? formatPrice(item.selling_price, item.currency)
-                  : `${formatPrice(item.selling_price, item.currency)} – ${formatPrice(item.max_selling_price, item.currency)}`}
+                Starting from {formatPrice(item.selling_price, item.currency)}
               </p>
               <span className={`status ${item.product_availability ? 'available' : 'unavailable'}`}>
                 {item.product_availability ? 'Available' : 'Unavailable'}
